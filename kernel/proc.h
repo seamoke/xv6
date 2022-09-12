@@ -89,6 +89,11 @@ struct proc {
   // p->lock must be held when using these:
   enum procstate state;        // Process state
   struct proc *parent;         // Parent process
+  int alarm_intervals;         // alarm every alarm_intervals ticks
+  void (*alarm_handler)();     
+  int alarm_ticks;             // current alarm ticks
+  struct trapframe *alarm_trapframe; //alarm trapframe saved
+  int alarm_goingoff;
   void *chan;                  // If non-zero, sleeping on chan
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait

@@ -54,6 +54,14 @@ r_sstatus()
   return x;
 }
 
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+
 static inline void 
 w_sstatus(uint64 x)
 {
@@ -323,8 +331,8 @@ sfence_vma()
 #define PGSIZE 4096 // bytes per page
 #define PGSHIFT 12  // bits of offset within a page
 
-#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
-#define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))
+#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))//high address
+#define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))//low address,there is
 
 #define PTE_V (1L << 0) // valid
 #define PTE_R (1L << 1)
