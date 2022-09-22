@@ -460,13 +460,20 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
   uint64 n, va0, pa0;
   int got_null = 0;
-
+  struct proc *p = myproc();
   while (got_null == 0 && max > 0)
   {
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
     if (pa0 == 0){
-      return -1;
+      if (va0 >= p->sz || va0 <= PGROUNDDOWN(p->trapframe->sp)||PGROUNDUP(va0)==PGROUNDDOWN(p->trapframe->sp)){
+        return -1;
+      }
+      printf("1111:%p %p %p\n",va0,p->sz,p->trapframe->sp);
+      char *mem=kalloc();
+      pa0=(uint64)mem;
+      memset(mem,0,PGSIZE);
+      mappages(pagetable,va0,PGSIZE,pa0,PTE_X|PTE_W | PTE_U | PTE_R);
     }
     n = PGSIZE - (srcva - va0);
     if (n > max)

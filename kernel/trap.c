@@ -72,7 +72,7 @@ void usertrap(void)
   {
     uint64 va = r_stval();
     //printf("page fault:%p\n",va);
-    if (va > p->sz || va < PGROUNDDOWN(p->trapframe->sp)||PGROUNDUP(va)==PGROUNDDOWN(p->trapframe->sp))
+    if (va >= p->sz || va <= PGROUNDDOWN(p->trapframe->sp)||PGROUNDUP(va)==PGROUNDDOWN(p->trapframe->sp))
     {
       p->killed = 1;
     }
