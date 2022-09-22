@@ -103,9 +103,17 @@ walkaddr(pagetable_t pagetable, uint64 va)
 
   if (va >= MAXVA)
     return 0;
+  struct proc *p = myproc();
   pte = walk(pagetable, va, 0);
   if (pte == 0 || (*pte & PTE_V) == 0){
-    return 0;
+    if (va >= p->sz || va <= PGROUNDDOWN(p->trapframe->sp)||PGROUNDUP(va)==PGROUNDDOWN(p->trapframe->sp)){
+      return 0;
+    }
+    char *mem=kalloc();
+    uint64 pa0=(uint64)mem;
+    memset(mem,0,PGSIZE);
+    mappages(pagetable,va,PGSIZE,pa0,PTE_X|PTE_W | PTE_U | PTE_R);
+    return (uint64)mem;
   }
   if ((*pte & PTE_U) == 0)
     return 0;
@@ -400,13 +408,7 @@ int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
     if (pa0 == 0){
-      if(dstva>=myproc()->sz){
-        return -1;
-      }
-      char *mem=kalloc();
-      pa0=(uint64)mem;
-      memset(mem,0,PGSIZE);
-      mappages(pagetable,va0,PGSIZE,pa0,PTE_X|PTE_W | PTE_U | PTE_R);
+      return -1;
     }
     n = PGSIZE - (dstva - va0);
     if (n > len)
@@ -432,13 +434,7 @@ int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
     if (pa0 == 0){
-      if(srcva>=myproc()->sz){
         return -1;
-      }
-      char *mem=kalloc();
-      pa0=(uint64)mem;
-      memset(mem,0,PGSIZE);
-      mappages(pagetable,va0,PGSIZE,pa0,PTE_X|PTE_W | PTE_U | PTE_R);
     }
     n = PGSIZE - (srcva - va0);
     if (n > len)
@@ -460,20 +456,12 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
   uint64 n, va0, pa0;
   int got_null = 0;
-  struct proc *p = myproc();
   while (got_null == 0 && max > 0)
   {
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
     if (pa0 == 0){
-      if (va0 >= p->sz || va0 <= PGROUNDDOWN(p->trapframe->sp)||PGROUNDUP(va0)==PGROUNDDOWN(p->trapframe->sp)){
-        return -1;
-      }
-      printf("1111:%p %p %p\n",va0,p->sz,p->trapframe->sp);
-      char *mem=kalloc();
-      pa0=(uint64)mem;
-      memset(mem,0,PGSIZE);
-      mappages(pagetable,va0,PGSIZE,pa0,PTE_X|PTE_W | PTE_U | PTE_R);
+      return -1;
     }
     n = PGSIZE - (srcva - va0);
     if (n > max)
