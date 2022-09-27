@@ -106,7 +106,7 @@ walkaddr(pagetable_t pagetable, uint64 va)
   struct proc *p = myproc();
   pte = walk(pagetable, va, 0);
   if (pte == 0 || (*pte & PTE_V) == 0){
-    if (va >= p->sz || va <= PGROUNDDOWN(p->trapframe->sp)||PGROUNDUP(va)==PGROUNDDOWN(p->trapframe->sp)){
+    if (va >= p->sz || va < PGROUNDDOWN(p->trapframe->sp)){
       return 0;
     }
     char *mem=kalloc();
