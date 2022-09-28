@@ -70,11 +70,13 @@ usertrap(void)
   } else if(r_scause()==13||r_scause()==15){
     uint64 va = r_stval();
     uint64 bottom = PGROUNDDOWN(va);
-    if(va>=MAXVA||bottom>=p->sz||bottom<p->trapframe->sp){
+    if(bottom>=p->sz||bottom==PGROUNDDOWN(p->trapframe->sp-PGSIZE)){
+      //printf("size out\n");
       p->killed=1;
     }
     else{
       if(cow_allocation(p->pagetable,bottom)!=0){
+        //printf("cow error\n");
         p->killed=1;
       }
     }

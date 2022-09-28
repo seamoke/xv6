@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -91,6 +93,9 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 int cow_allocation(pagetable_t pagetable, uint64 va){
   uint64 pa,flags;
   pte_t* pte;
+  if(va>=MAXVA){
+    return -1;
+  }
   pte=walk(pagetable,va,0);
   if(pte==0||(*pte&PTE_V)==0){
     return -1;
