@@ -266,7 +266,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-
+  printf("p:%p np=%p\n",p,np);
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -333,7 +333,7 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-
+  printf("p:%p initproc:%p\n",p,initproc);
   if(p == initproc)
     panic("init exiting");
 

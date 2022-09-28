@@ -22,8 +22,9 @@ void
 kvminit()
 {
   kernel_pagetable = (pagetable_t) kalloc();
+  //printf("111:%p\n",kernel_pagetable);
   memset(kernel_pagetable, 0, PGSIZE);
-
+  //printf("222\n");
   // uart registers
   kvmmap(UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
@@ -86,6 +87,25 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     }
   }
   return &pagetable[PX(0, va)];
+}
+int cow_allocation(pagetable_t pagetable, uint64 va){
+  uint64 pa,flags;
+  pte_t* pte;
+  pte=walk(pagetable,va,0);
+  if(pte==0||(*pte&PTE_V)==0){
+    return -1;
+  }
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+  if(flags&PTE_COW){
+    char *mem = kalloc();
+    if(mem == 0) return -1;
+    memmove(mem,(char*)pa,PGSIZE);
+    flags = (flags&~PTE_COW)|PTE_W;
+    *pte= PA2PTE((uint64)mem)|flags;
+    kfree((void*)pa);
+  }
+  return 0;
 }
 
 // Look up a virtual address, return the physical address,
@@ -311,7 +331,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -320,11 +339,12 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    if(*pte&PTE_W){
+      flags = (flags|PTE_COW)&(~PTE_W);
+      *pte=((*pte)|PTE_COW)&(~PTE_W);
+    }
+    repcadd(pa);
+    if(mappages(new, i, PGSIZE,pa, flags) != 0){
       goto err;
     }
   }
@@ -358,6 +378,9 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    if(cow_allocation(pagetable,va0)!=0){
+      return -1;
+    }
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
