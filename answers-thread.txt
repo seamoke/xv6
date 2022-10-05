@@ -1,0 +1,2 @@
+If we don't use lock to contorl it, it will two pointer multiple connections to link's head in insert function(line 36) when multi-thread processing.
+So we miss a key.
