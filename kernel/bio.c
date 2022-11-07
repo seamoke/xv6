@@ -52,15 +52,19 @@ binit(void)
   //bcache.head[0].next= &bcache.buf[0];
   //bcache.buf->prev = &bcache.head[0];
   //bcache.buf[NBUF-1].next = 0;
+  for(int i=0;i<NBUCKET;i++){
+    bcache.head[i].next=&bcache.head[i];
+    bcache.head[i].prev=&bcache.head[i];
+  }
   int id=0;
-  for(b = bcache.buf; b < bcache.buf+NBUF-1; b++){
+  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
     b->next = bcache.head[id].next;
+    bcache.head[id].next->prev = b;
     b->prev = &bcache.head[id];
     bcache.head[id].next = b;
     id=(id+1)%NBUCKET;
     initsleeplock(&b->lock, "buffer");
   }
-  initsleeplock(&b->lock,"buffer");
 }
 
 int index_is_avaliable(int i,int j){
@@ -79,48 +83,51 @@ int index_is_avaliable(int i,int j){
 static struct buf*
 bget(uint dev, uint blockno)
 {
-  struct buf *b;
+  struct buf* b;
   int id = hash(blockno);
-  printf("block:%d id: %d ",blockno,id);
+  //printf("block:%d id: %d ", blockno, id);
   acquire(&bcache.lock[id]);
   // Is the block already cached?
   b = bcache.head[id].next;
-  while(b){
-    if(b->dev == dev && b->blockno == blockno){
-    b->refcnt++;
-    release(&bcache.lock[id]);
-    acquiresleep(&b->lock);
-    return b;
+  //printf("addb:%d ", &b);
+  while (b!=&bcache.head[id]) {
+    if (b->dev == dev && b->blockno == blockno) {
+      b->refcnt++;
+      release(&bcache.lock[id]);
+      acquiresleep(&b->lock);
+      return b;
     }
-    b=b->next;
+    b = b->next;
   }
   release(&bcache.lock[id]);
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
   int least_time = 0x3f3f3f3f;
   int min_index = -1;
-  struct buf *temp=0;
-  for (int i = 0; i < NBUCKET; i++) {
-    if(!index_is_avaliable(id,i))
+  struct buf* temp = 0;
+  //printf(" find ");
+  for (int k = 0; k < NBUCKET; k++) {
+    int i = (k + id) % NBUCKET;
+    if (!index_is_avaliable(id, i))
       continue;
     acquire(&bcache.lock[i]);
     b = bcache.head[i].next;
-    while (b){
-      if(b->refcnt==0 && b->time<least_time){
-        if(min_index!=-1&&min_index!=i)
+    while (b!=&bcache.head[i]) {
+      if (b->refcnt == 0 && b->time < least_time) {
+        if (min_index != -1 && min_index != i)
           release(&bcache.lock[min_index]);
-        least_time=b->time;
+        least_time = b->time;
         min_index = i;
         temp = b;
       }
-      b=b->next;
+      b = b->next;
     }
-    if(min_index!=i){
+    if (min_index != i) {
       release(&bcache.lock[i]);
     }
   }
-  if(min_index==-1){
-    printf("%d %d\n",&(*b),least_time);
+  if (min_index == -1) {
+    printf("%d %d\n", &(*b), least_time);
     panic("bget: no buffers");
   }
   b = temp;
@@ -133,33 +140,52 @@ bget(uint dev, uint blockno)
     acquiresleep(&b->lock);
     return b;
   }
-  else{
-    acquire(&bcache.lock[id]);
-    b->next->prev=b->prev;
-    b->prev->next=b->next;
-    b->next = bcache.head[id].next;
-    b->prev = &bcache.head[id];
-    bcache.head[id].next = b;
-    release(&bcache.lock[id]);
-    release(&bcache.lock[min_index]);
-    acquiresleep(&b->lock);
-    return b;
-  }
-  /*
-      while(b){
-      if (b->refcnt == 0) {
-        b->dev = dev;
-        b->blockno = blockno;
-        b->valid = 0;
-        b->refcnt = 1;
-        release(&bcache.lock[i]);
-        acquiresleep(&b->lock);
-        return b;
-      }
-    }
-  */
-}
+  acquire(&bcache.lock[id]);
+  b->next->prev = b->prev;
+  b->prev->next = b->next;
+  
+  b->next = bcache.head[id].next;
+  bcache.head[id].next->prev = b;
+  b->prev = &bcache.head[id];
+  bcache.head[id].next = b;
 
+  release(&bcache.lock[id]);
+  release(&bcache.lock[min_index]);
+  acquiresleep(&b->lock);
+  return b;
+} 
+/* static struct buf*
+bget(uint dev, uint blockno)
+{
+  struct buf *b;
+
+  acquire(&bcache.lock[0]);
+
+  // Is the block already cached?
+  for(b = bcache.head[0].next; b ; b = b->next){
+    if(b->dev == dev && b->blockno == blockno){
+      b->refcnt++;
+      release(&bcache.lock[0]);
+      acquiresleep(&b->lock);
+      return b;
+    }
+  }
+
+  // Not cached.
+  // Recycle the least recently used (LRU) unused buffer.
+  for(b = bcache.head[0].next; b ; b = b->next){
+    if(b->refcnt == 0) {
+      b->dev = dev;
+      b->blockno = blockno;
+      b->valid = 0;
+      b->refcnt = 1;
+      release(&bcache.lock[0]);
+      acquiresleep(&b->lock);
+      return b;
+    }
+  }
+  panic("bget: no buffers");
+} */
 // Return a locked buf with the contents of the indicated block.
 struct buf*
 bread(uint dev, uint blockno)
@@ -171,10 +197,10 @@ bread(uint dev, uint blockno)
     virtio_disk_rw(b, 0);
     b->valid = 1;
   }
-  for(int i=0;i<NBUCKET;i++){
+  /* for(int i=0;i<NBUCKET;i++){
     struct buf * temp = bcache.head[i].next;
     int count =0;
-    while(temp){
+    while(temp!=&bcache.head[i]){
       count++;
       temp=temp->next;
     }
@@ -184,7 +210,7 @@ bread(uint dev, uint blockno)
     else{
       printf("%d\n",count);
     }
-  }
+  } */
   return b;
 }
 
