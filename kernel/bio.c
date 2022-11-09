@@ -99,7 +99,7 @@ bget(uint dev, uint blockno)
     }
     b = b->next;
   }
-  release(&bcache.lock[id]);
+  //release(&bcache.lock[id]);
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
   int least_time = 0x3f3f3f3f;
@@ -110,11 +110,12 @@ bget(uint dev, uint blockno)
     int i = (k + id) % NBUCKET;
     if (!index_is_avaliable(id, i))
       continue;
-    acquire(&bcache.lock[i]);
+    if(id!=i)
+      acquire(&bcache.lock[i]);
     b = bcache.head[i].next;
     while (b!=&bcache.head[i]) {
       if (b->refcnt == 0 && b->time < least_time) {
-        if (min_index != -1 && min_index != i)
+        if (min_index != -1 && min_index != i && min_index!=id)
           release(&bcache.lock[min_index]);
         least_time = b->time;
         min_index = i;
@@ -122,7 +123,7 @@ bget(uint dev, uint blockno)
       }
       b = b->next;
     }
-    if (min_index != i) {
+    if (min_index != i && i!=id) {
       release(&bcache.lock[i]);
     }
   }
@@ -140,7 +141,6 @@ bget(uint dev, uint blockno)
     acquiresleep(&b->lock);
     return b;
   }
-  acquire(&bcache.lock[id]);
   b->next->prev = b->prev;
   b->prev->next = b->next;
   
