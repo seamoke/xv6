@@ -29,7 +29,7 @@ extern uint ticks;
 struct {
   struct spinlock lock[NBUCKET];
   struct buf buf[NBUF];
-
+  struct spinlock wait;
   // Linked list of all buffers, through prev/next.
   // Sorted by how recently the buffer was used.
   // head.next is most recent, head.prev is least.
@@ -47,7 +47,7 @@ binit(void)
   struct buf *b;
   for(int i=0;i<NBUCKET;i++)
     initlock(&bcache.lock[i], "bcache");
-
+  initlock(&bcache.wait, "bcache");
   // Create linked list of buffers
   //bcache.head[0].next= &bcache.buf[0];
   //bcache.buf->prev = &bcache.head[0];
@@ -108,10 +108,13 @@ bget(uint dev, uint blockno)
   //printf(" find ");
   for (int k = 0; k < NBUCKET; k++) {
     int i = (k + id) % NBUCKET;
-    if (!index_is_avaliable(id, i))
-      continue;
-    if(id!=i)
+    /* if (!index_is_avaliable(id, i))
+      continue; */
+    if(id!=i){
+      acquire(&bcache.wait);
       acquire(&bcache.lock[i]);
+      release(&bcache.wait);
+    }
     b = bcache.head[i].next;
     while (b!=&bcache.head[i]) {
       if (b->refcnt == 0 && b->time < least_time) {
