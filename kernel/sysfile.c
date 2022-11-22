@@ -484,3 +484,37 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void){
+  uint64 length;
+  int prot,flags,fd;
+  struct file *f;
+  if(argaddr(1, &length) < 0||argint(2,&prot)<0||argint(3,&flags)<0||argfd(4,&fd,&f)<0){
+    return -1;
+  }
+  if(!f->writable && (prot&PROT_WRITE) && (flags&MAP_SHARED)){
+    return -1;
+  }
+  struct proc* p = myproc();
+  struct vma * pvma = p->vma;
+  for(int i=0;i<MAXVMA;i++){
+    if(pvma[i].vaild == 0){
+      pvma[i].address = p->sz;
+      pvma[i].f = filedup(f);
+      pvma[i].flags = flags;
+      pvma[i].length = PGROUNDUP(length);
+      pvma[i].offset = 0;
+      pvma[i].prot = prot;
+      pvma[i].vaild = 1;
+      p->sz += pvma[i].length;
+      return pvma[i].address;
+    }
+  }
+  return 0;
+}
+
+uint64
+sys_munmap(void){
+  return -1;
+}
