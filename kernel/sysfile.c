@@ -3,18 +3,18 @@
 // Mostly argument checking, since we don't trust
 // user code, and calls into file.c and fs.c.
 //
-
-#include "defs.h"
+#include "types.h"
+#include "param.h"
+#include "sleeplock.h"
+#include "spinlock.h"
 #include "fcntl.h"
 #include "file.h"
 #include "fs.h"
-#include "param.h"
+#include "defs.h"
 #include "proc.h"
 #include "riscv.h"
-#include "sleeplock.h"
-#include "spinlock.h"
 #include "stat.h"
-#include "types.h"
+
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -510,8 +510,8 @@ filewrite_offset(struct file *f, uint64 addr, int n,int offset)
 
       begin_op();
       ilock(f->ip);
-      if ((r = writei(f->ip, 1, addr + i, f->off, n1)) > 0)
-        f->off += r;
+      if ((r = writei(f->ip, 1, addr + i, offset, n1)) > 0)
+        offset += r;
       iunlock(f->ip);
       end_op();
 
@@ -543,7 +543,9 @@ uint64 sys_munmap(void) {
         addr < pvma[i].address + pvma[i].offset + pvma[i].length) {
       int l = min(length,pvma[i].length);
       if(pvma[i].flags & MAP_SHARED){
-        _filewrite
+        if(filewrite_offset(pvma[i].f,addr,l,pvma[i].offset)==-1){
+          return -1;
+        }
       }
       uvmunmap(p->pagetable,addr,l/PGSIZE,1);
       if (addr == pvma[i].address + pvma[i].offset) {  // At the begining
@@ -553,10 +555,10 @@ uint64 sys_munmap(void) {
         pvma[i].length-=l;
         p->sz -= l;
       }
-
       if(pvma[i].length==0){
-
+        fileclose(pvma[i].f);
       }
+      return 0;
     }
   }
   return -1;

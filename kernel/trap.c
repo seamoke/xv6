@@ -69,7 +69,7 @@ void usertrap(void) {
     uint64 va = r_stval();
     if (va < p->trapframe->sp || va >= p->sz) {
       goto bad;
-    }
+  }
     va = PGROUNDDOWN(va);
     //printf("%d\n",va);
     struct vma * pvma = p->vma;
