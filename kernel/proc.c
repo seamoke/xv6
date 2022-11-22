@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -279,6 +280,17 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  for(int i=0;i<MAXVMA;i++){
+    if(p->vma[i].vaild==1){
+      np->vma[i].address = p->vma[i].address;
+      np->vma[i].vaild = p->vma[i].vaild;
+      np->vma[i].flags = p->vma[i].flags;
+      np->vma[i].length = p->vma[i].length;
+      np->vma[i].offset = p->vma[i].offset;
+      np->vma[i].prot = p->vma[i].prot;
+      np->vma[i].f = filedup(p->vma[i].f);
+    }
+  }
   np->sz = p->sz;
 
   np->parent = p;
@@ -332,6 +344,39 @@ reparent(struct proc *p)
   }
 }
 
+
+int munmap(uint64 addr, uint64 length) {
+  struct proc* p = myproc();
+  struct vma* pvma = p->vma;
+  addr = PGROUNDDOWN(addr);
+  length = PGROUNDUP(length);
+  for (int i = 0; i < MAXVMA; i++) {
+    if (pvma[i].vaild == 1 && addr >= pvma[i].address + pvma[i].offset &&
+        addr < pvma[i].address + pvma[i].offset + pvma[i].length) {
+      int l = length > pvma[i].length? pvma[i].length:length;
+      if(pvma[i].flags & MAP_SHARED){
+        if(filewrite_offset(pvma[i].f,addr,l,addr-pvma[i].address)==-1){
+          return -1;
+        }
+      }
+      uvmunmap(p->pagetable,addr,l/PGSIZE,1);
+      if (addr == pvma[i].address + pvma[i].offset) {  // At the begining
+        pvma[i].length-=l;
+        pvma[i].offset+=l;
+      } else {  // At the end
+        pvma[i].length-=l;
+        p->sz -= l;
+      }
+      if(pvma[i].length==0){
+        fileclose(pvma[i].f);
+        pvma[i].vaild = 0;
+      }
+      return 0;
+    }
+  }
+  return -1;
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
@@ -343,6 +388,12 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
+  for(int i=0;i<MAXVMA;i++){
+    if(p->vma[i].vaild==1){
+      munmap(p->vma[i].address+p->vma[i].offset,p->vma[i].length);
+      p->vma[i].vaild=0;
+    }
+  }
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){

@@ -34,6 +34,7 @@ void            fileinit(void);
 int             fileread(struct file*, uint64, int n);
 int             filestat(struct file*, uint64 addr);
 int             filewrite(struct file*, uint64, int n);
+int             filewrite_offset(struct file *f, uint64 addr, int n,int offset);
 
 // fs.c
 void            fsinit(int);
