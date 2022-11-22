@@ -89,9 +89,8 @@ struct vma{
   uint64 length;
   int prot;
   int flags;
-  struct file * f;
+  struct file* f;
   uint64 offset;
-  //int valid_len;
 };
 
 // Per-process state

@@ -1,10 +1,14 @@
-#include "defs.h"
+#include "types.h"
+#include "riscv.h"
 #include "memlayout.h"
 #include "param.h"
-#include "proc.h"
-#include "riscv.h"
+#include "defs.h"
 #include "spinlock.h"
-#include "types.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
+#include "proc.h"
+
 
 struct spinlock tickslock;
 uint ticks;
@@ -62,35 +66,36 @@ void usertrap(void) {
   } else if ((which_dev = devintr()) != 0) {
     // ok
   } else if (r_scause() == 13 || r_scause() == 15) {
-   /* uint64 va = r_stval();
+    uint64 va = r_stval();
     if (va < p->trapframe->sp || va >= p->sz) {
       goto bad;
     }
     va = PGROUNDDOWN(va);
+    //printf("%d\n",va);
     struct vma * pvma = p->vma;
     int i;
     for(i=0;i<MAXVMA;i++){
-      if(pvma[i].vaild && va>=pvma[i].address && va<pvma[i].address+pvma[i].length){
+      if(pvma[i].vaild && va>=pvma[i].address+pvma[i].offset && va<pvma[i].address+pvma[i].offset+pvma[i].length){
         char* mem = kalloc();
         if(mem == 0) goto bad;
         memset(mem,0,PGSIZE);
-        int flag = (pvma[i].flags<<1)|PTE_U;
-        if(mappages(p->pagetable,va,PGSIZE,mem,flag)!=0){
+        int flag = (pvma[i].prot<<1)|PTE_U;
+        if(mappages(p->pagetable,va,PGSIZE,(uint64)mem,flag)!=0){
           kfree(mem);
-          goto bad;
+          goto bad; 
         }
         int offset = va - pvma[i].address;
         ilock(pvma[i].f->ip);
-        readi(pvma[i]->ip,1,va,offset,PGSIZE);
-        iunlock(pvma[i].f->ip); 
+        readi(pvma[i].f->ip,1,va,offset,PGSIZE);
+        iunlock(pvma[i].f->ip);  
         break;
       }
     }
     if(i==MAXVMA){
       goto bad;
-    } */
+    } 
   } else {
-    //bad:
+    bad:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
