@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "proc.h": "c",
+        "pthread.h": "c",
+        "param.h": "c",
+        "string_view": "c",
+        "regex": "c",
+        "spinlock.h": "c",
+        "defs.h": "c",
+        "file.h": "c",
+        "types.h": "c",
+        "sleeplock.h": "c",
+        "fcntl.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}
