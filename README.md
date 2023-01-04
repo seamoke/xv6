@@ -14,7 +14,7 @@ Mit6.s081 Operator System
   traps
   util
 ```
-net暂时还没写完(等我网络学完回来补)，对应branch获得代码
+对应branch获得代码
 ```
 git fetch
 git checkout branch_name
